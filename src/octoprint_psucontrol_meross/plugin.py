@@ -2,6 +2,7 @@ from pathlib import Path
 
 import flask
 import octoprint.plugin
+from octoprint.access.permissions import Permissions
 
 from . import meross_client
 
@@ -95,6 +96,9 @@ class PSUControlMeross(
     def get_settings_version(self):
         return 2
 
+    def is_template_autoescaped(self):
+        return True
+
     def get_template_configs(self):
         return [
             {"type": "settings", "custom_bindings": True},
@@ -145,7 +149,13 @@ class PSUControlMeross(
             ),
         }
 
+    def is_api_protected(self):
+        return True
+
     def on_api_command(self, event, payload):
+        # The API is only used by the (admin-only) settings dialog
+        if not Permissions.SETTINGS.can():
+            flask.abort(403)
         self._logger.debug(f"ON_EVENT {event!r}")
         if event == "try_login":
             try:
@@ -220,6 +230,8 @@ class PSUControlMeross(
         }
 
     def on_api_get(self, request):
+        if not Permissions.SETTINGS.can():
+            flask.abort(403)
         device_list = ()
         if self.meross.is_authenticated:
             device_list = [dev.asdict() for dev in self.meross.list_devices()]
